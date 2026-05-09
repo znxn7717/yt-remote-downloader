@@ -92,7 +92,8 @@ You can run a manual workflow in GitHub and download the result directly from **
 
 - Cookies are optional. Many public videos will download without cookies.
 - Some videos (age-restricted/private/rate-limited) may require cookies.
-- For shared usage, each user should run from their own fork and keep their own `YTDLP_COOKIES` secret (see [Add your own cookies safely (optional)](#add-your-own-cookies-safely-optional)).
+- If you see `Sign in to confirm you're not a bot`, add cookies secret and re-run.
+- For shared usage, each user should run from their own fork and keep their own cookies secret (see [Add your own cookies safely (optional)](#add-your-own-cookies-safely-optional)).
 - Files are uploaded from the `downloads/` folder.
 - Artifact retention is set to 7 days.
 
@@ -100,8 +101,9 @@ You can run a manual workflow in GitHub and download the result directly from **
 
 1. In GitHub, open **Settings** -> **Secrets and variables** -> **Actions**
 2. Click **New repository secret**
-3. Name: `YTDLP_COOKIES`
-4. Value: paste your full `cookies.txt` content (Netscape format)
-5. Save
+3. Use one of these names:
+   - `YTDLP_COOKIES`: paste full `cookies.txt` content (Netscape format)
+   - `YTDLP_COOKIES_B64`: paste base64 of the same `cookies.txt` content
+4. Save
 
-The workflow will automatically use this secret if it exists.
+The workflow will automatically use these secrets if they exist (`YTDLP_COOKIES_B64` is preferred when both exist).

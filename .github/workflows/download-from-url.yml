@@ -36,15 +36,29 @@ jobs:
         shell: bash
         env:
           YTDLP_COOKIES: ${{ secrets.YTDLP_COOKIES }}
+          YTDLP_COOKIES_B64: ${{ secrets.YTDLP_COOKIES_B64 }}
         run: |
           set -euo pipefail
 
-          if [[ -n "${YTDLP_COOKIES:-}" ]]; then
+          cookies_source="none"
+
+          if [[ -n "${YTDLP_COOKIES_B64:-}" ]]; then
+            printf '%s' "${YTDLP_COOKIES_B64}" | base64 --decode > cookies.txt
+            cookies_source="YTDLP_COOKIES_B64"
+          elif [[ -n "${YTDLP_COOKIES:-}" ]]; then
             printf '%s\n' "${YTDLP_COOKIES}" > cookies.txt
+            cookies_source="YTDLP_COOKIES"
+          fi
+
+          if [[ -f cookies.txt ]]; then
             chmod 600 cookies.txt
             echo "use_cookies=true" >> "$GITHUB_OUTPUT"
+            echo "cookies_source=${cookies_source}" >> "$GITHUB_OUTPUT"
+            echo "Cookies detected from secret: ${cookies_source}" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "use_cookies=false" >> "$GITHUB_OUTPUT"
+            echo "cookies_source=none" >> "$GITHUB_OUTPUT"
+            echo "Cookies not provided. Public links may work, but YouTube may block remote runs." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Download file
@@ -69,15 +83,42 @@ jobs:
             YTDLP_ARGS+=(--cookies "cookies.txt")
           fi
 
-          downloaded_path="$(yt-dlp "${YTDLP_ARGS[@]}" --print "after_move:filepath" "${INPUT_URL}" | tail -n 1)"
+          yt_dlp_log="yt-dlp-output.log"
 
-          if [[ -z "${downloaded_path}" || ! -f "${downloaded_path}" ]]; then
-            echo "Could not detect downloaded file path." >&2
+          set +e
+          yt-dlp "${YTDLP_ARGS[@]}" --print "after_move:filepath" "${INPUT_URL}" 2>&1 | tee "${yt_dlp_log}"
+          yt_status=${PIPESTATUS[0]}
+          set -e
+
+          if [[ "${yt_status}" -ne 0 ]]; then
+            if grep -Eiq "Sign in to confirm you.?re not a bot" "${yt_dlp_log}"; then
+              {
+                echo "### Download blocked by YouTube bot check"
+                echo ""
+                echo "GitHub Actions runs on remote shared cloud IPs, and YouTube often blocks these requests."
+                echo ""
+                echo "Fix:"
+                echo "1. Run from your own fork."
+                echo "2. Add `YTDLP_COOKIES` (plain text) or `YTDLP_COOKIES_B64` (base64) in repository secrets."
+                echo "3. Re-run the workflow."
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+
+            exit "${yt_status}"
+          fi
+
+          downloaded_count="$(find downloads -type f | wc -l | tr -d '[:space:]')"
+
+          if [[ "${downloaded_count}" -eq 0 ]]; then
+            echo "Download step succeeded but no files were found in downloads/." >&2
             exit 1
           fi
 
+          downloaded_path="$(find downloads -type f | head -n 1)"
+
           echo "downloaded_path=${downloaded_path}" >> "$GITHUB_OUTPUT"
-          echo "Downloaded file: ${downloaded_path}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Downloaded files: ${downloaded_count}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Example file: ${downloaded_path}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload downloadable artifact
         uses: actions/upload-artifact@v4

@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       format:
-        description: "yt-dlp format selector (example: b, bv*+ba/b)"
+        description: "yt-dlp format selector (example: b, bv*+ba/b, b[filesize<500M])"
         required: false
         default: "b"
         type: string
@@ -86,7 +86,7 @@ jobs:
             --remote-components "ejs:github"
             --extractor-args "youtube:player_client=ios,web,mweb"
             --js-runtimes "node"
-            -f "b[filesize<500M]"
+            -f "${INPUT_FORMAT}"
             --abort-on-error
           )
 
